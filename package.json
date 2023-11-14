@@ -1,0 +1,35 @@
+{
+  "name": "vite-plugin-deadfile",
+  "version": "1.0.0",
+  "license": "MIT",
+  "author": "stauren@qq.com",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stauren/vite-plugin-deadfile.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stauren/vite-plugin-deadfile/issues"
+  },
+  "homepage": "https://github.com/stauren/vite-plugin-deadfile/tree/main/#readme",
+  "devDependencies": {
+    "@types/node": "^20.8.10",
+    "typescript": "^5.2.2",
+    "vite": "^4.2.0"
+  },
+  "peerDependencies": {
+    "vite": "^4.2.0"
+  }
+}
