@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-deadfile",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "author": "stauren@qq.com",
   "type": "module",
@@ -14,7 +14,7 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "rollup -c rollup.config.js"
   },
   "repository": {
     "type": "git",
@@ -25,7 +25,10 @@
   },
   "homepage": "https://github.com/stauren/vite-plugin-deadfile/tree/main/#readme",
   "devDependencies": {
+    "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^20.8.10",
+    "rollup": "^4.4.1",
+    "tslib": "^2.6.2",
     "typescript": "^5.2.2",
     "vite": "^4.2.0"
   },
