@@ -5,9 +5,9 @@ import pkg from './package.json' assert { type: 'json' };
 export default {
   input: 'src/index.ts',
   output: [{
-    file: pkg.exports['.'],
+    file: pkg.exports.require,
     sourcemap: false,
-    format: 'esm',
+    format: 'cjs',
   }],
   external: [
     'node:fs',

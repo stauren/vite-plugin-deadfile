@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-deadfile",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "author": "stauren@qq.com",
   "type": "module",
@@ -11,10 +11,11 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    "require": "./dist/index.cjs",
+    "import": "./dist/index.js"
   },
   "scripts": {
-    "build": "rollup -c rollup.config.js"
+    "build": "rollup -c rollup.config.js && node ./scripts/generate-esm-wrapper.js"
   },
   "repository": {
     "type": "git",
