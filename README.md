@@ -12,6 +12,17 @@ export default defineConfig({
 });
 ```
 
+## Output format
+
+```text
+All source files: 123
+Used source files: 120
+Unused source files: 3
+  ./path/to/unused/file-a
+  ./path/to/unused/file-b
+  ./path/to/unused/file-c
+```
+
 ## Options
 
 ### include
@@ -63,17 +74,6 @@ export default defineConfig({
     output: 'dead-files.txt'
   )],
 });
-```
-
-## Output format
-
-```text
-All source files: 123
-Used source files: 120
-Unused source files: 3
-  ./path/to/unused/file-a
-  ./path/to/unused/file-b
-  ./path/to/unused/file-c
 ```
 
 ## Caveats
