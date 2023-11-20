@@ -1,4 +1,7 @@
 # Changelog
+# [1.0.3](https://github.com/stauren/vite-plugin-deadfile/tree/v1.0.3) (2023-11-16)
+
+- fix a missing dist file bug
 
 # [1.0.2](https://github.com/stauren/vite-plugin-deadfile/tree/v1.0.2) (2023-11-16)
 
