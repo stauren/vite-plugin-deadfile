@@ -35,9 +35,9 @@ import { defineConfig } from 'vite';
 import deadFile from 'vite-plugin-deadfile';
 
 export default defineConfig({
-  plugins: [deadFile(
+  plugins: [deadFile({
     include: ['src']
-  )],
+  })],
 });
 ```
 
@@ -50,10 +50,10 @@ import { defineConfig } from 'vite';
 import deadFile from 'vite-plugin-deadfile';
 
 export default defineConfig({
-  plugins: [deadFile(
+  plugins: [deadFile({
     include: ['src'],
     exclude: ['src/vendors']
-  )],
+  })],
 });
 ```
 
@@ -70,9 +70,9 @@ import { defineConfig } from 'vite';
 import deadFile from 'vite-plugin-deadfile';
 
 export default defineConfig({
-  plugins: [deadFile(
+  plugins: [deadFile({
     output: 'dead-files.txt'
-  )],
+  })],
 });
 ```
 
