@@ -98,7 +98,7 @@ export default function vitePluginDeadFile(
         `All source files: ${sourceFiles.size}`,
         `Used source files: ${touchedFiles.size}`,
         `Unused source files: ${deadFiles.size}`,
-        ...[...deadFiles].map((fullPath) => `  .${fullPath.substring(projectRoot.length)}`),
+        ...[...deadFiles].map((fullPath) => `  /${fullPath.substring(projectRoot.length)}`),
       ];
       if (typeof output === 'string' && isSafeFileName(output)) {
         const outputFile = resolve(projectRoot, output);
