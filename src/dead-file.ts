@@ -37,15 +37,15 @@ async function readSourceFiles(root: string, includeFiles: string[] = [], exclud
   const level1Sources = await fs.readdir(root);
   const readAll = level1Sources.filter(isLegalSource).map(async (fileName) => {
     const subFileName = resolve(root, fileName);
-    if (includeFiles.length > 0 && !includeFiles.includes(subFileName)) {
+    if (includeFiles.length > 0 && !includeFiles.some(includeFile => subFileName.startsWith(includeFile))) {
       return;
     }
-    if (excludeFiles.includes(subFileName)) {
+    if (excludeFiles.some(excludeFile => subFileName.startsWith(excludeFile))) {
       return;
     }
     const fileStat = await fs.stat(subFileName);
     if (fileStat.isDirectory()) {
-      const subResult = await readSourceFiles(subFileName);
+      const subResult = await readSourceFiles(subFileName, includeFiles, excludeFiles);
       result = [...result, ...subResult];
     } else if (fileStat.isFile()) {
       result.push(subFileName);
