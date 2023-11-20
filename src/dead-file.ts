@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 
 export interface DeadFilePluginConfig {
+  projectRoot?: string;
   exclude?: string[];
   include?: string[];
   output?: string;
@@ -55,8 +56,7 @@ async function readSourceFiles(root: string, includeFiles: string[] = [], exclud
 }
 
 export default function vitePluginDeadFile(
-  projectRoot: string,
-  { include = [], exclude = [], output }: DeadFilePluginConfig = {}
+  { projectRoot = '.', include = [], exclude = [], output }: DeadFilePluginConfig = {}
 ): Plugin {
   let doAnalysis = false;
   let touchedFiles: Set<string>;
