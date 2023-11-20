@@ -36,7 +36,7 @@ async function readSourceFiles(root: string, includeFiles: string[] = [], exclud
   let result: string[] = [];
   const level1Sources = await fs.readdir(root);
   const readAll = level1Sources.filter(isLegalSource).map(async (fileName) => {
-    const subFileName = `${root}/${fileName}`;
+    const subFileName = resolve(root, fileName);
     if (includeFiles.length > 0 && !includeFiles.includes(subFileName)) {
       return;
     }
