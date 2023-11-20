@@ -40,6 +40,10 @@ export default defineConfig({
   })],
 });
 ```
+### projectRoot
+
+A string. Project root directory. Can be an absolute path, or a path relative to the current working directory.
+Defaults to '.'
 
 ### exclude
 
