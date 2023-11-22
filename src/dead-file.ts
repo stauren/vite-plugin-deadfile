@@ -13,7 +13,7 @@ export interface DeadFilePluginConfig {
 }
 
 const REG_NODE_MODULES = /node_modules\//;
-const REG_HIDDEN_FILES = /\/\.[^/]+/;
+const REG_HIDDEN_FILES = /\/\.[^/]+$/;
 
 // refer to https://github.com/micromatch/picomatch for more match pattern
 function createFileFilter(root: string, include: FilterPattern, rawExclude: FilterPattern, includeHidden: boolean) {
@@ -57,7 +57,6 @@ async function readSourceFiles(root: string, filter: ReturnType<CreateFilter>) {
       const subResult = await readSourceFiles(subFilePath, filter);
       result = [...result, ...subResult];
     } else if (fileStat.isFile()) {
-      console.log(subFilePath, filter(subFilePath));
       if (filter(subFilePath)) {
         result.push(subFilePath);
       }
