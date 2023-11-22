@@ -8,7 +8,9 @@ import { defineConfig } from 'vite';
 import deadFile from 'vite-plugin-deadfile';
 
 export default defineConfig({
-  plugins: [deadFile()],
+  plugins: [deadFile({
+    root: 'src',
+  })],
 });
 ```
 
@@ -25,43 +27,56 @@ Unused source files: 3
 
 ## Options
 
+### root 
+
+A string. Project root directory. Can be an absolute path, or a path relative to the current working directory.
+
+Defaults to '.'
+
 ### include
 
-An array of source files/folders to be compared with files referenced during compilation.
+A valid [picomatch](https://github.com/micromatch/picomatch#globbing-features) pattern, or array of patterns.
+
+Source files to be compared with files referenced during compilation.
 
 If no value is provided, all files in the root directory will be considered as source files.
+
+Please refer to https://www.npmjs.com/package/@rollup/pluginutils#createfilter for more detail.
 ```js
 import { defineConfig } from 'vite';
 import deadFile from 'vite-plugin-deadfile';
 
 export default defineConfig({
   plugins: [deadFile({
-    include: ['src']
+    include: ['src/**']
   })],
 });
 ```
-### projectRoot
-
-A string. Project root directory. Can be an absolute path, or a path relative to the current working directory.
-Defaults to '.'
 
 ### exclude
 
-An array of files/folders to be configured as non-source files, so they won't appear in the result.
+A valid [picomatch](https://github.com/micromatch/picomatch#globbing-features) pattern, or array of patterns.
 
+Files to be configured as non-source files, so they won't appear in the result.
+
+Please refer to https://www.npmjs.com/package/@rollup/pluginutils#createfilter for more detail.
 ```js
 import { defineConfig } from 'vite';
 import deadFile from 'vite-plugin-deadfile';
 
 export default defineConfig({
   plugins: [deadFile({
-    include: ['src'],
-    exclude: ['src/vendors']
+    exclude: ['vendors/**', /\.md$/i]
   })],
 });
 ```
 
-> `node_modules` and hidden files (file with a name start with `.`) are excluded by default.
+> `node_modules` are excluded by default.
+
+### includeHiddenFiles
+Accept hidden files (file with a name start with `.`) as source files.
+
+Default to false.
 
 ### output
 
@@ -92,7 +107,7 @@ In the following example, `interface-a.ts` will NOT be marked as used.
 export interface A {}
 
 // index.ts
-import type { A } from '.interface-a';
+import type { A } from './interface-a';
 export function main(param: A) {}
 ```
 This is because vite use rollup to build a project. Since rollup only build javascript files, a typescript file must be transformed into javascript before handing to rollup, vite does this with [esbuild plugin](https://github.com/vitejs/vite/blob/main/packages/vite/src/node/plugins/esbuild.ts) in transform hook:

@@ -1,25 +1,40 @@
 import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
+import { createFilter } from '@rollup/pluginutils';
+import type { FilterPattern, CreateFilter } from '@rollup/pluginutils';
 import type { Plugin } from 'vite';
 
 export interface DeadFilePluginConfig {
-  projectRoot?: string;
-  exclude?: string[];
-  include?: string[];
+  root?: string;
+  exclude?: FilterPattern;
+  include?: FilterPattern;
   output?: string;
+  includeHiddenFiles?: boolean;
 }
 
-function transformToFullPath(root: string, subFiles: string[]) {
-  return subFiles.map((fname) => {
-    if (fname.startsWith('/')) {
-      return fname;
-    }
-    return resolve(root, fname);
+const REG_NODE_MODULES = /node_modules\//;
+const REG_HIDDEN_FILES = /\/\.[^/]+/;
+
+// refer to https://github.com/micromatch/picomatch for more match pattern
+function createFileFilter(root: string, include: FilterPattern, rawExclude: FilterPattern, includeHidden: boolean) {
+  const exclude =
+    rawExclude instanceof Array ? [...rawExclude] : ([rawExclude].filter((o) => o !== null) as (string | RegExp)[]);
+
+  // exclude all files in node_modules directory
+  exclude.push(REG_NODE_MODULES);
+
+  // exclude all hidden files start with '.'
+  if (!includeHidden) {
+    exclude.push(REG_HIDDEN_FILES);
+  }
+
+  return createFilter(include, exclude, {
+    resolve: root,
   });
 }
 
 function isLegalSource(fileName: string) {
-  if (fileName.startsWith('.')) {
+  if (fileName === '.' || fileName === '..') {
     return false;
   }
   if (fileName === 'node_modules') {
@@ -32,36 +47,41 @@ function isSafeFileName(name: string) {
   return name.match(/^[a-zA-Z0-9._-]+$/);
 }
 
-async function readSourceFiles(root: string, includeFiles: string[] = [], excludeFiles: string[] = []) {
+async function readSourceFiles(root: string, filter: ReturnType<CreateFilter>) {
   let result: string[] = [];
   const level1Sources = await fs.readdir(root);
   const readAll = level1Sources.filter(isLegalSource).map(async (fileName) => {
-    const subFileName = resolve(root, fileName);
-    if (includeFiles.length > 0 && !includeFiles.some(includeFile => subFileName.startsWith(includeFile))) {
-      return;
-    }
-    if (excludeFiles.some(excludeFile => subFileName.startsWith(excludeFile))) {
-      return;
-    }
-    const fileStat = await fs.stat(subFileName);
+    const subFilePath = resolve(root, fileName);
+    const fileStat = await fs.stat(subFilePath);
     if (fileStat.isDirectory()) {
-      const subResult = await readSourceFiles(subFileName, includeFiles, excludeFiles);
+      const subResult = await readSourceFiles(subFilePath, filter);
       result = [...result, ...subResult];
     } else if (fileStat.isFile()) {
-      result.push(subFileName);
+      console.log(subFilePath, filter(subFilePath));
+      if (filter(subFilePath)) {
+        result.push(subFilePath);
+      }
     }
   });
   await Promise.all(readAll);
   return result;
 }
 
-export default function vitePluginDeadFile(
-  { projectRoot = '.', include = [], exclude = [], output }: DeadFilePluginConfig = {}
-): Plugin {
+export default function vitePluginDeadFile({
+  root = '.',
+  include = [],
+  exclude = [],
+  includeHiddenFiles = false,
+  output,
+}: DeadFilePluginConfig = {}): Plugin {
   let doAnalysis = false;
   let touchedFiles: Set<string>;
   let sourceFiles: Set<string>;
   let deadFiles: Set<string>;
+
+  const absoluteRoot = resolve(root);
+  const fileFilter = createFileFilter(absoluteRoot, include, exclude, includeHiddenFiles);
+
   return {
     name: 'dead-file',
     enforce: 'pre',
@@ -70,17 +90,10 @@ export default function vitePluginDeadFile(
       if (resolvedConfig.command === 'build') {
         doAnalysis = true;
         touchedFiles = new Set();
-        sourceFiles = new Set(
-          await readSourceFiles(
-            projectRoot,
-            transformToFullPath(projectRoot, include),
-            transformToFullPath(projectRoot, exclude)
-          )
-        );
+        sourceFiles = new Set(await readSourceFiles(absoluteRoot, fileFilter));
         deadFiles = new Set(sourceFiles);
       }
     },
-
 
     load(id: string) {
       if (doAnalysis) {
@@ -98,10 +111,10 @@ export default function vitePluginDeadFile(
         `All source files: ${sourceFiles.size}`,
         `Used source files: ${touchedFiles.size}`,
         `Unused source files: ${deadFiles.size}`,
-        ...[...deadFiles].map((fullPath) => `  .${fullPath.substring(resolve(projectRoot).length)}`),
+        ...[...deadFiles].map((fullPath) => `  .${fullPath.substring(absoluteRoot.length)}`),
       ];
       if (typeof output === 'string' && isSafeFileName(output)) {
-        const outputFile = resolve(projectRoot, output);
+        const outputFile = resolve(absoluteRoot, output);
         console.log(`Unused source files write to: ${outputFile}`);
         fs.writeFile(outputFile, result.join('\n'));
       } else {

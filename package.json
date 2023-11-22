@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-deadfile",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "license": "MIT",
   "author": "stauren@qq.com",
   "type": "module",
@@ -34,6 +34,9 @@
     "vite": "^4.2.0"
   },
   "peerDependencies": {
-    "vite": "^4.2.0"
+    "vite": "^4.0.0 || ^5.0.0"
+  },
+  "dependencies": {
+    "@rollup/pluginutils": "^5.0.5"
   }
 }
