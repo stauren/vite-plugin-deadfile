@@ -1,8 +1,10 @@
 import { promises as fs } from 'node:fs';
-import { resolve } from 'node:path';
-import { createFilter } from '@rollup/pluginutils';
-import type { FilterPattern, CreateFilter } from '@rollup/pluginutils';
-import type { Plugin } from 'vite';
+import { resolve, extname } from 'node:path';
+import { createFilter } from 'vite';
+import { parse, type Module } from '@swc/core';
+import { ImportVisitor } from './visitor';
+import { isSafeFileName, cleanUrl } from './utils';
+import type { FilterPattern, Plugin } from 'vite';
 
 export interface DeadFilePluginConfig {
   root?: string;
@@ -13,7 +15,10 @@ export interface DeadFilePluginConfig {
 }
 
 const REG_NODE_MODULES = /node_modules\//;
-const REG_HIDDEN_FILES = /\/\.[^/]+/;
+const REG_HIDDEN_FILES = /\/\.[^/]+$/;
+const REG_VALID_EXTENSION = /\.\w+$/;
+
+const astSupportedFileExtensions = ['js', 'jsx', 'ts', 'tsx'];
 
 // refer to https://github.com/micromatch/picomatch for more match pattern
 function createFileFilter(root: string, include: FilterPattern, rawExclude: FilterPattern, includeHidden: boolean) {
@@ -43,11 +48,7 @@ function isLegalSource(fileName: string) {
   return true;
 }
 
-function isSafeFileName(name: string) {
-  return name.match(/^[a-zA-Z0-9._-]+$/);
-}
-
-async function readSourceFiles(root: string, filter: ReturnType<CreateFilter>) {
+async function readSourceFiles(root: string, filter: ReturnType<typeof createFilter>) {
   let result: string[] = [];
   const level1Sources = await fs.readdir(root);
   const readAll = level1Sources.filter(isLegalSource).map(async (fileName) => {
@@ -57,7 +58,6 @@ async function readSourceFiles(root: string, filter: ReturnType<CreateFilter>) {
       const subResult = await readSourceFiles(subFilePath, filter);
       result = [...result, ...subResult];
     } else if (fileStat.isFile()) {
-      console.log(subFilePath, filter(subFilePath));
       if (filter(subFilePath)) {
         result.push(subFilePath);
       }
@@ -78,9 +78,21 @@ export default function vitePluginDeadFile({
   let touchedFiles: Set<string>;
   let sourceFiles: Set<string>;
   let deadFiles: Set<string>;
+  let visitor: ImportVisitor;
 
   const absoluteRoot = resolve(root);
   const fileFilter = createFileFilter(absoluteRoot, include, exclude, includeHiddenFiles);
+
+  const touchFile = (id: string) => {
+    if (doAnalysis) {
+      if (id.indexOf('node_modules') === -1) {
+        if (sourceFiles.has(id)) {
+          touchedFiles.add(id);
+          deadFiles.delete(id);
+        }
+      }
+    }
+  };
 
   return {
     name: 'dead-file',
@@ -92,21 +104,59 @@ export default function vitePluginDeadFile({
         touchedFiles = new Set();
         sourceFiles = new Set(await readSourceFiles(absoluteRoot, fileFilter));
         deadFiles = new Set(sourceFiles);
+        visitor = new ImportVisitor();
       }
     },
 
     load(id: string) {
-      if (doAnalysis) {
-        if (id.indexOf('node_modules') === -1) {
-          if (sourceFiles.has(id)) {
-            touchedFiles.add(id);
-            deadFiles.delete(id);
+      if (!doAnalysis) return;
+      touchFile(id);
+    },
+
+    async transform(source, importer) {
+      if (!doAnalysis) return;
+      if (!importer.startsWith('/') || importer.includes('node_modules')) {
+        return;
+      }
+
+      const ext = extname(REG_VALID_EXTENSION.test(importer) ? importer : cleanUrl(importer)).slice(1);
+
+      if (!astSupportedFileExtensions.includes(ext)) {
+        return;
+      }
+
+      let mod: Module | undefined = undefined;
+      try {
+        mod = await parse(source, {
+          syntax: 'typescript',
+          tsx: true,
+          target: 'es2022',
+        });
+      } catch (e: unknown) {
+        console.log(`[vite-plugin-deadfile] parse error: `, importer, e);
+      }
+
+      if (mod) {
+        visitor.visitProgram(mod);
+        const rawImports = visitor.getImports();
+        const resolvedImports = await Promise.all(
+          rawImports.map((rawImport) => {
+            const resolved = this.resolve(rawImport, importer);
+            return resolved;
+          })
+        );
+        const resolvedIds = resolvedImports.map((r) => r?.id);
+        resolvedIds.forEach((id) => {
+          if (id) {
+            touchFile(id);
           }
-        }
+        });
       }
     },
 
     renderStart() {
+      if (!doAnalysis) return;
+
       const result = [
         `All source files: ${sourceFiles.size}`,
         `Used source files: ${touchedFiles.size}`,
