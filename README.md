@@ -95,11 +95,29 @@ export default defineConfig({
 });
 ```
 
+### outputDir
+
+Output file directory, support multiple formats: `/path/to/dir`, `./path/to/dir`, `path/to/dir`.
+
+If no output dir is provided, `.` is used.
+
+```js
+import { defineConfig } from 'vite';
+import deadFile from 'vite-plugin-deadfile';
+
+export default defineConfig({
+  plugins: [deadFile({
+    outputDir: './output'
+    output: 'dead-files.txt'
+  })],
+});
+```
+
 ## Caveats
 
 ### Pure Type Reference can NOT be traced
 
->__Update__: After v1.1.0 `@swc/core` is being used to scan import statement in source files, now it is traceable now. Still, be aware that the scan could go wrong in edge cases. Please check again before removing any source files and report those issues on github.
+>__Update__: After v1.1.0 `@swc/core` is being used to scan import statement in source files, it is traceable now. Still, be aware that the scan could go wrong in edge cases. Please check again before removing any source files and report those issues on github.
 
 Imported typescript files only have their interfaces or types being referenced will not be marked as used.
 
