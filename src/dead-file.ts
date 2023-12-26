@@ -2,8 +2,10 @@ import { promises as fs } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { createFilter } from 'vite';
 import { parse, type Module } from '@swc/core';
+import { ensureDir } from 'fs-extra';
 import { ImportVisitor } from './visitor';
-import { isSafeFileName, cleanUrl } from './utils';
+import { isSafeFileName, isSafePath, cleanUrl, isParentDir } from './utils';
+import { log } from './log';
 import type { FilterPattern, Plugin } from 'vite';
 
 export interface DeadFilePluginConfig {
@@ -11,6 +13,7 @@ export interface DeadFilePluginConfig {
   exclude?: FilterPattern;
   include?: FilterPattern;
   output?: string;
+  outputDir?: string;
   includeHiddenFiles?: boolean;
 }
 
@@ -67,11 +70,40 @@ async function readSourceFiles(root: string, filter: ReturnType<typeof createFil
   return result;
 }
 
+function getOutputPath(absRoot: string, outputDir: string): false | string {
+  if (!isSafePath(outputDir)) {
+    log(`Unsafe outputDir: ${outputDir}`);
+    return false;
+  }
+  const absOutputDir = outputDir.startsWith('/')
+    ? outputDir
+    : resolve(absRoot, outputDir);
+
+  if (!isParentDir(absRoot, absOutputDir)) {
+    log(`outputDir must be inside: ${absRoot}, but got: ${absOutputDir}`);
+    return false;
+  }
+
+  return absOutputDir;
+}
+
+async function ensureOutputFilePath(absRoot: string, outputDir: string, output: string): Promise<false | string> {
+  const dir = getOutputPath(absRoot, outputDir);
+  if (!dir) return dir;
+  if (!isSafeFileName(output)) {
+    log(`Unsafe output file name: ${output}`);
+    return false;
+  }
+  await ensureDir(dir);
+  return resolve(dir, output);
+}
+
 export default function vitePluginDeadFile({
   root = '.',
   include = [],
   exclude = [],
   includeHiddenFiles = false,
+  outputDir = '.',
   output,
 }: DeadFilePluginConfig = {}): Plugin {
   let doAnalysis = false;
@@ -133,7 +165,7 @@ export default function vitePluginDeadFile({
           target: 'es2022',
         });
       } catch (e: unknown) {
-        console.log(`[vite-plugin-deadfile] parse error: `, importer, e);
+        log('parse error: ', importer, e);
       }
 
       if (mod) {
@@ -154,7 +186,7 @@ export default function vitePluginDeadFile({
       }
     },
 
-    renderStart() {
+    async renderStart() {
       if (!doAnalysis) return;
 
       const result = [
@@ -163,10 +195,13 @@ export default function vitePluginDeadFile({
         `Unused source files: ${deadFiles.size}`,
         ...[...deadFiles].map((fullPath) => `  .${fullPath.substring(absoluteRoot.length)}`),
       ];
-      if (typeof output === 'string' && isSafeFileName(output)) {
-        const outputFile = resolve(absoluteRoot, output);
-        console.log(`Unused source files write to: ${outputFile}`);
-        fs.writeFile(outputFile, result.join('\n'));
+
+      if (output) {
+        const outputFile = await ensureOutputFilePath(absoluteRoot, outputDir, output);
+        if (outputFile) {
+          await fs.writeFile(outputFile, result.join('\n'));
+          log(`Unused source files write to: ${outputFile}`);
+        }
       } else {
         result.map((line) => console.log(line));
       }

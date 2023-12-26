@@ -1,4 +1,7 @@
 # Changelog
+# [1.1.2](https://github.com/stauren/vite-plugin-deadfile/tree/v1.1.2) (2023-12-26)
+- Add a new config `outputDir`
+
 # [1.1.1](https://github.com/stauren/vite-plugin-deadfile/tree/v1.1.1) (2023-12-13)
 - Fix a bug caused in dev mode
 
