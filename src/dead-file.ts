@@ -15,6 +15,7 @@ export interface DeadFilePluginConfig {
   output?: string;
   outputDir?: string;
   includeHiddenFiles?: boolean;
+  throwWhenFound?: boolean;
 }
 
 const REG_NODE_MODULES = /node_modules\//;
@@ -104,6 +105,7 @@ export default function vitePluginDeadFile({
   exclude = [],
   includeHiddenFiles = false,
   outputDir = '.',
+  throwWhenFound = false,
   output,
 }: DeadFilePluginConfig = {}): Plugin {
   let doAnalysis = false;
@@ -186,7 +188,7 @@ export default function vitePluginDeadFile({
       }
     },
 
-    async renderStart() {
+    async buildEnd() {
       if (!doAnalysis) return;
 
       const result = [
@@ -204,6 +206,10 @@ export default function vitePluginDeadFile({
         }
       } else {
         result.map((line) => console.log(line));
+      }
+
+      if (throwWhenFound && deadFiles.size > 0) {
+        this.error(`[vite-plugin-deadfile]: Found ${deadFiles.size} unused source file${ deadFiles.size > 1 ? 's' : ''}.`);
       }
     },
   };

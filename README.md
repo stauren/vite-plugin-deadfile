@@ -113,6 +113,12 @@ export default defineConfig({
 });
 ```
 
+### throwWhenFound
+
+If `throwWhenFound` is set to `true`, the build process will abort when any unused source files are found.
+
+If no `throwWhenFound` is provided, `false` is used.
+
 ## Caveats
 
 ### Pure Type Reference can NOT be traced
