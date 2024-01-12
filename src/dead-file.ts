@@ -1,12 +1,15 @@
 import { promises as fs } from 'node:fs';
 import { resolve, extname } from 'node:path';
-import { createFilter } from 'vite';
 import { parse, type Module } from '@swc/core';
 import { ensureDir } from 'fs-extra';
-import { ImportVisitor } from './visitor';
+import { createFilter } from 'vite';
+import { ImportVisitor, DynamicImportVisitor } from './visitor';
 import { isSafeFileName, isSafePath, cleanUrl, isParentDir } from './utils';
 import { log } from './log';
+import FileMarker from './file-marker';
 import type { FilterPattern, Plugin } from 'vite';
+
+type FileUsedCallback = (file: string) => boolean;
 
 export interface DeadFilePluginConfig {
   root?: string;
@@ -16,69 +19,21 @@ export interface DeadFilePluginConfig {
   outputDir?: string;
   includeHiddenFiles?: boolean;
   throwWhenFound?: boolean;
+  isDynamicModuleLive?: FileUsedCallback;
 }
 
+const REG_VALID_EXTENSION = /\.\w+$/;
 const REG_NODE_MODULES = /node_modules\//;
 const REG_HIDDEN_FILES = /\/\.[^/]+$/;
-const REG_VALID_EXTENSION = /\.\w+$/;
 
 const astSupportedFileExtensions = ['js', 'jsx', 'ts', 'tsx'];
-
-// refer to https://github.com/micromatch/picomatch for more match pattern
-function createFileFilter(root: string, include: FilterPattern, rawExclude: FilterPattern, includeHidden: boolean) {
-  const exclude =
-    rawExclude instanceof Array ? [...rawExclude] : ([rawExclude].filter((o) => o !== null) as (string | RegExp)[]);
-
-  // exclude all files in node_modules directory
-  exclude.push(REG_NODE_MODULES);
-
-  // exclude all hidden files start with '.'
-  if (!includeHidden) {
-    exclude.push(REG_HIDDEN_FILES);
-  }
-
-  return createFilter(include, exclude, {
-    resolve: root,
-  });
-}
-
-function isLegalSource(fileName: string) {
-  if (fileName === '.' || fileName === '..') {
-    return false;
-  }
-  if (fileName === 'node_modules') {
-    return false;
-  }
-  return true;
-}
-
-async function readSourceFiles(root: string, filter: ReturnType<typeof createFilter>) {
-  let result: string[] = [];
-  const level1Sources = await fs.readdir(root);
-  const readAll = level1Sources.filter(isLegalSource).map(async (fileName) => {
-    const subFilePath = resolve(root, fileName);
-    const fileStat = await fs.stat(subFilePath);
-    if (fileStat.isDirectory()) {
-      const subResult = await readSourceFiles(subFilePath, filter);
-      result = [...result, ...subResult];
-    } else if (fileStat.isFile()) {
-      if (filter(subFilePath)) {
-        result.push(subFilePath);
-      }
-    }
-  });
-  await Promise.all(readAll);
-  return result;
-}
 
 function getOutputPath(absRoot: string, outputDir: string): false | string {
   if (!isSafePath(outputDir)) {
     log(`Unsafe outputDir: ${outputDir}`);
     return false;
   }
-  const absOutputDir = outputDir.startsWith('/')
-    ? outputDir
-    : resolve(absRoot, outputDir);
+  const absOutputDir = outputDir.startsWith('/') ? outputDir : resolve(absRoot, outputDir);
 
   if (!isParentDir(absRoot, absOutputDir)) {
     log(`outputDir must be inside: ${absRoot}, but got: ${absOutputDir}`);
@@ -99,65 +54,63 @@ async function ensureOutputFilePath(absRoot: string, outputDir: string, output: 
   return resolve(dir, output);
 }
 
-export default function vitePluginDeadFile({
+// refer to https://github.com/micromatch/picomatch for more match pattern
+function createFileFilter(root: string, include: FilterPattern, rawExclude: FilterPattern, includeHidden: boolean) {
+  const exclude =
+    rawExclude instanceof Array ? [...rawExclude] : ([rawExclude].filter((o) => o !== null) as (string | RegExp)[]);
+
+  // exclude all files in node_modules directory
+  exclude.push(REG_NODE_MODULES);
+
+  // exclude all hidden files start with '.'
+  if (!includeHidden) {
+    exclude.push(REG_HIDDEN_FILES);
+  }
+
+  return createFilter(include, exclude, {
+    resolve: root,
+  });
+}
+
+function isLegalTransformTarget(importer: string): boolean {
+  if (!importer.startsWith('/') || importer.includes('node_modules')) {
+    return false;
+  }
+
+  const ext = extname(REG_VALID_EXTENSION.test(importer) ? importer : cleanUrl(importer)).slice(1);
+
+  if (!astSupportedFileExtensions.includes(ext)) {
+    return false;
+  }
+  return true;
+}
+
+function getPrePlugin({
   root = '.',
   include = [],
   exclude = [],
   includeHiddenFiles = false,
-  outputDir = '.',
-  throwWhenFound = false,
-  output,
-}: DeadFilePluginConfig = {}): Plugin {
-  let doAnalysis = false;
-  let touchedFiles: Set<string>;
-  let sourceFiles: Set<string>;
-  let deadFiles: Set<string>;
-  let visitor: ImportVisitor;
-
+}: DeadFilePluginConfig): Plugin {
   const absoluteRoot = resolve(root);
-  const fileFilter = createFileFilter(absoluteRoot, include, exclude, includeHiddenFiles);
 
-  const touchFile = (id: string) => {
-    if (doAnalysis) {
-      if (id.indexOf('node_modules') === -1) {
-        if (sourceFiles.has(id)) {
-          touchedFiles.add(id);
-          deadFiles.delete(id);
-        }
-      }
-    }
-  };
-
+  let visitor: ImportVisitor;
   return {
-    name: 'dead-file',
+    name: 'dead-file-pre',
     enforce: 'pre',
+    apply: 'build',
 
-    async configResolved(resolvedConfig) {
-      if (resolvedConfig.command === 'build') {
-        doAnalysis = true;
-        touchedFiles = new Set();
-        sourceFiles = new Set(await readSourceFiles(absoluteRoot, fileFilter));
-        deadFiles = new Set(sourceFiles);
-        visitor = new ImportVisitor();
-      }
+    async configResolved() {
+      const fileFilter = createFileFilter(root, include, exclude, includeHiddenFiles);
+      await FileMarker.init(absoluteRoot, fileFilter);
+      visitor = new ImportVisitor();
     },
 
     load(id: string) {
-      if (!doAnalysis) return;
-      touchFile(id);
+      FileMarker.touch(id);
     },
 
     async transform(source, importer) {
-      if (!doAnalysis) return;
-      if (!importer.startsWith('/') || importer.includes('node_modules')) {
-        return;
-      }
-
-      const ext = extname(REG_VALID_EXTENSION.test(importer) ? importer : cleanUrl(importer)).slice(1);
-
-      if (!astSupportedFileExtensions.includes(ext)) {
-        return;
-      }
+      if (!isLegalTransformTarget(importer)) return;
 
       let mod: Module | undefined = undefined;
       try {
@@ -171,6 +124,7 @@ export default function vitePluginDeadFile({
       }
 
       if (mod) {
+        visitor.init();
         visitor.visitProgram(mod);
         const rawImports = visitor.getImports();
         const resolvedImports = await Promise.all(
@@ -182,21 +136,90 @@ export default function vitePluginDeadFile({
         const resolvedIds = resolvedImports.map((r) => r?.id);
         resolvedIds.forEach((id) => {
           if (id) {
-            touchFile(id);
+            FileMarker.touch(id);
           }
         });
       }
     },
+  };
+}
+function getPostPlugin({
+  root = '.',
+  outputDir = '.',
+  throwWhenFound = false,
+  isDynamicModuleLive,
+  output,
+}: DeadFilePluginConfig): Plugin {
+  let visitor: DynamicImportVisitor;
+  const absoluteRoot = resolve(root);
 
+  return {
+    name: 'dead-file-post',
+    enforce: 'post',
+    apply: 'build',
+
+    configResolved() {
+      visitor = new DynamicImportVisitor();
+    },
+
+    async transform(source, importer) {
+      if (!isLegalTransformTarget(importer)) return;
+
+      let mod: Module | undefined = undefined;
+      try {
+        mod = await parse(source, {
+          syntax: 'ecmascript',
+          dynamicImport: true,
+          target: 'es2022',
+        });
+      } catch (e: unknown) {
+        log('parse error: ', importer, e);
+      }
+
+      if (mod) {
+        visitor.init();
+        visitor.visitProgram(mod);
+        const rawImports = visitor.getViteDynamicImports();
+        if (rawImports.length > 0) {
+          const resolvedImports = await Promise.all(
+            rawImports.map((rawImport) => {
+              const resolved = this.resolve(rawImport, importer);
+              return resolved;
+            })
+          );
+          resolvedImports.forEach((resolvedId) => resolvedId && FileMarker.viteDynamicImports.add(resolvedId.id));
+        }
+      }
+    },
     async buildEnd() {
-      if (!doAnalysis) return;
+      const dynImport = FileMarker.viteDynamicImports;
+      if (dynImport.size > 0) {
+        if (isDynamicModuleLive) {
+          dynImport.forEach((file) => {
+            if (!isDynamicModuleLive(file)) {
+              FileMarker.deadFiles.add(file);
+              FileMarker.touchedFiles.delete(file);
+            }
+          });
+        }
+      }
 
-      const result = [
-        `All source files: ${sourceFiles.size}`,
-        `Used source files: ${touchedFiles.size}`,
-        `Unused source files: ${deadFiles.size}`,
-        ...[...deadFiles].map((fullPath) => `  .${fullPath.substring(absoluteRoot.length)}`),
+      let result = [
+        '[vite-plugin-deadfile]:',
+        `  All source files: ${FileMarker.sourceFiles.size}`,
+        `  Used source files: ${FileMarker.touchedFiles.size}`,
+        `  Unused source files: ${FileMarker.deadFiles.size}`,
+        ...[...FileMarker.deadFiles].map((fullPath) => `    .${fullPath.substring(absoluteRoot.length)}`),
       ];
+      if (dynImport.size > 0 && !isDynamicModuleLive) {
+        result = [
+          ...result,
+          `  You may need to config 'isDynamicModuleLive' to check if the ${
+            dynImport.size
+          } dynamically glob-import file${dynImport.size > 1 ? 's are' : ' is'} needed:`,
+          ...[...dynImport].map((fullPath) => `    .${fullPath.substring(absoluteRoot.length)}`),
+        ];
+      }
 
       if (output) {
         const outputFile = await ensureOutputFilePath(absoluteRoot, outputDir, output);
@@ -208,9 +231,40 @@ export default function vitePluginDeadFile({
         result.map((line) => console.log(line));
       }
 
-      if (throwWhenFound && deadFiles.size > 0) {
-        this.error(`[vite-plugin-deadfile]: Found ${deadFiles.size} unused source file${ deadFiles.size > 1 ? 's' : ''}.`);
+      if (throwWhenFound && FileMarker.deadFiles.size > 0) {
+        this.error(
+          `[vite-plugin-deadfile]: Found ${FileMarker.deadFiles.size} unused source file${
+            FileMarker.deadFiles.size > 1 ? 's' : ''
+          }.`
+        );
       }
     },
   };
+}
+
+export default function vitePluginDeadFile({
+  root = '.',
+  include = [],
+  exclude = [],
+  includeHiddenFiles = false,
+  outputDir = '.',
+  throwWhenFound = false,
+  isDynamicModuleLive,
+  output,
+}: DeadFilePluginConfig): Plugin[] {
+  return [
+    getPrePlugin({
+      root,
+      include,
+      exclude,
+      includeHiddenFiles,
+    }),
+    getPostPlugin({
+      root,
+      outputDir,
+      throwWhenFound,
+      output,
+      isDynamicModuleLive,
+    }),
+  ];
 }
