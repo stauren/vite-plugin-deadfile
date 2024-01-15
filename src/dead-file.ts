@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { resolve, extname } from 'node:path';
+import { resolve, extname, relative } from 'node:path';
 import { parse, type Module } from '@swc/core';
 import { ensureDir } from 'fs-extra';
 import { createFilter } from 'vite';
@@ -18,7 +18,7 @@ export interface DeadFilePluginConfig {
   output?: string;
   outputDir?: string;
   includeHiddenFiles?: boolean;
-  throwWhenFound?: boolean;
+  throwWhenFound?: boolean | number;
   isDynamicModuleLive?: FileUsedCallback;
 }
 
@@ -196,7 +196,8 @@ function getPostPlugin({
       if (dynImport.size > 0) {
         if (isDynamicModuleLive) {
           dynImport.forEach((file) => {
-            if (!isDynamicModuleLive(file)) {
+            const rel = relative(absoluteRoot, file);
+            if (!isDynamicModuleLive(rel)) {
               FileMarker.deadFiles.add(file);
               FileMarker.touchedFiles.delete(file);
             }
@@ -209,14 +210,16 @@ function getPostPlugin({
         `  All source files: ${FileMarker.sourceFiles.size}`,
         `  Used source files: ${FileMarker.touchedFiles.size}`,
         `  Unused source files: ${FileMarker.deadFiles.size}`,
-        ...[...FileMarker.deadFiles].map((fullPath) => `    .${fullPath.substring(absoluteRoot.length)}`),
+        ...[...FileMarker.deadFiles].map((fullPath) => `    ./${relative(absoluteRoot, fullPath)}`),
       ];
       if (dynImport.size > 0 && !isDynamicModuleLive) {
         result = [
           ...result,
-          `  You may need to config 'isDynamicModuleLive' to check if the ${
+          `  You may need to config 'isDynamicModuleLive' to check if the following ${
             dynImport.size
-          } dynamically glob-import file${dynImport.size > 1 ? 's are' : ' is'} needed:`,
+          } dynamically glob-import file${
+            dynImport.size > 1 ? 's are' : ' is'
+          } needed, more info https://github.com/stauren/vite-plugin-deadfile?tab=readme-ov-file#isdynamicmodulelive`,
           ...[...dynImport].map((fullPath) => `    .${fullPath.substring(absoluteRoot.length)}`),
         ];
       }
@@ -231,12 +234,16 @@ function getPostPlugin({
         result.map((line) => console.log(line));
       }
 
-      if (throwWhenFound && FileMarker.deadFiles.size > 0) {
-        this.error(
-          `[vite-plugin-deadfile]: Found ${FileMarker.deadFiles.size} unused source file${
-            FileMarker.deadFiles.size > 1 ? 's' : ''
-          }.`
-        );
+      if (throwWhenFound !== false) {
+        if (
+          (throwWhenFound === true && FileMarker.deadFiles.size > 0) ||
+          (typeof throwWhenFound === 'number' && FileMarker.deadFiles.size >= throwWhenFound)
+        )
+          this.error(
+            `[vite-plugin-deadfile]: Found ${FileMarker.deadFiles.size} unused source file${
+              FileMarker.deadFiles.size > 1 ? 's' : ''
+            }.`
+          );
       }
     },
   };

@@ -1,4 +1,10 @@
 # Changelog
+# [1.2.0](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.0) (2024-01-15)
+- Add a new config `isDynamicModuleLive`, Vite's `dynamic-import` modules could be better managed.
+- `throwWhenFound` also accept a number format parameter.
+- Split the plugin into 2 Vite plugins underneath because type reference must be done in the 'pre' phase and glob-import analysis must be done in the 'post' phase.
+- Refactor some code and a new class `FileMarker` is abstracted.
+
 # [1.1.3](https://github.com/stauren/vite-plugin-deadfile/tree/v1.1.3) (2024-01-08)
 - Add a new config `throwWhenFound`
 
