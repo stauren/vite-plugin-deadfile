@@ -1,6 +1,10 @@
 # vite-plugin-deadfile [![npm](https://img.shields.io/npm/v/vite-plugin-deadfile.svg)](https://npmjs.com/package/vite-plugin-deadfile)
 
-This plugin helps you find unused source file(dead files) in your project.
+This plugin helps to find unused source file(dead files) in Vite projects.
+
+Features:
+- Pure type reference could be detected with the help of `@swc/core`.
+- Help to manage unused source files imported unintentionally by Vite's [dynamic import](https://vitejs.dev/guide/features.html#dynamic-import) feature.
 
 ```js
 // vite.config.js
@@ -115,11 +119,60 @@ export default defineConfig({
 
 ### throwWhenFound
 
+Could be a boolean or a number.
+
 If `throwWhenFound` is set to `true`, the build process will abort when any unused source files are found.
+
+If `throwWhenFound` is set to `10`, the build process will abort when 10 or more unused source files are found.
 
 If no `throwWhenFound` is provided, `false` is used.
 
+```js
+import { defineConfig } from 'vite';
+import deadFile from 'vite-plugin-deadfile';
+
+export default defineConfig({
+  plugins: [deadFile({
+    // if 10 or more unused source files are found
+    // you CI/CD process will abort
+    throwWhenFound: 10
+  })],
+});
+```
+
+### isDynamicModuleLive
+
+Vite has a [dynamic import](https://vitejs.dev/guide/features.html#dynamic-import) feature which will imports source files with [glob-import](https://vitejs.dev/guide/features.html#glob-import).
+
+The problem with glob-import is it breaks the 'detect dead files by references' assumption of this plugin. So the life or death situation of glob-imported files have to be listed explicitly.
+
+`isDynamicModuleLive` is a callback which receives the relative file path as the parameter. If the file is still useful, the callback returns `true`.
+
+Generally, you could match the given file path to your router config because most glob-import happen in the router and if a page is not used, it will be removed from the route config.
+
+```js
+import { defineConfig } from 'vite';
+import deadFile from 'vite-plugin-deadfile';
+import routeInfo from './my-route-config';
+
+function fileIsUsedInRouter(file) {
+  // implement this function according to your route config
+  return routeInfo.includes(file);
+}
+
+export default defineConfig({
+  plugins: [deadFile({
+    isDynamicModuleLive: (file) => {
+      return fileIsUsedInRouter(file);
+    }
+  })],
+});
+```
+
 ## Caveats
+
+### Check before deleting
+Some unreferenced files such as markdowns may be useful, check again before deleting those files.
 
 ### Pure Type Reference can NOT be traced
 
@@ -166,6 +219,3 @@ Similarly, [@rollup/plugin-typescript](https://github.com/rollup/plugins/blob/ma
 Either way, the imports of pure type references are lost after files are compiled into javascript. So they will be wrongly considered as not used.
 
 There are several tsconfig about the elimination of type imports: `verbatimModuleSyntax`, `preserveValueImports`, `importsNotUsedAsValues`. It seems they are either not useful or conflicting with vite, so it not possible to trace the references of pure types for now.
-
-### Check before delete
-Some unreferenced files such as markdowns may be useful, check again before deleting those files.
