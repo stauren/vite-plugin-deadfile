@@ -9,10 +9,10 @@ export default defineConfig({
     target: 'esnext',
     emptyOutDir: false,
     lib: {
-      formats: ['cjs'],
+      formats: ['es', 'cjs'],
       entry: resolve('./src/index.ts'),
       name: 'vitePluginDeadFile',
-      fileName: 'index.cjs',
+      fileName: 'index',
     },
     rollupOptions: {
       external: ['@swc/core', 'node_modules'],

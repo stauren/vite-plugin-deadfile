@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-deadfile",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "license": "MIT",
   "author": "stauren@qq.com",
   "type": "module",
@@ -23,7 +23,7 @@
   },
   "scripts": {
     "tsc": "tsc --emitDeclarationOnly",
-    "build": "npm run tsc && vite build --ssr && node ./scripts/generate-esm-wrapper.js"
+    "build": "npm run tsc && vite build --ssr"
   },
   "repository": {
     "type": "git",
