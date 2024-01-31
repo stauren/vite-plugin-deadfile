@@ -12,7 +12,10 @@ function isLegalSource(fileName: string) {
   return true;
 }
 
-async function readSourceFiles(root: string, filter: ReturnType<typeof createFilter>) {
+async function readSourceFiles(
+  root: string,
+  filter: ReturnType<typeof createFilter>,
+) {
   let result: string[] = [];
   const level1Sources = await fs.readdir(root);
   const readAll = level1Sources.filter(isLegalSource).map(async (fileName) => {
@@ -32,22 +35,34 @@ async function readSourceFiles(root: string, filter: ReturnType<typeof createFil
 }
 
 export default class FileMarker {
-  public static touchedFiles: Set<string> = new Set();
-  public static sourceFiles: Set<string> = new Set();
-  public static deadFiles: Set<string> = new Set();
-  public static viteDynamicImports: Set<string> = new Set();
+  public touchedFiles: Set<string> = new Set();
+  public sourceFiles: Set<string> = new Set();
+  public deadFiles: Set<string> = new Set();
+  public viteDynamicImports: Set<string> = new Set();
 
-  public static async init(root: string, filter: ReturnType<typeof createFilter>) {
+  constructor() {
     this.touchedFiles = new Set();
-    this.sourceFiles = new Set(await readSourceFiles(root, filter));
-    this.deadFiles = new Set(this.sourceFiles);
     this.viteDynamicImports = new Set();
   }
-  public static touch(id: string) {
+
+  public async init(root: string, filter: ReturnType<typeof createFilter>) {
+    this.sourceFiles = new Set(await readSourceFiles(root, filter));
+    this.deadFiles = new Set(this.sourceFiles);
+  }
+  public revive(id: string) {
     if (id.indexOf('node_modules') === -1) {
       if (this.sourceFiles.has(id)) {
         this.touchedFiles.add(id);
         this.deadFiles.delete(id);
+      }
+    }
+  }
+
+  public kill(id: string) {
+    if (id.indexOf('node_modules') === -1) {
+      if (this.sourceFiles.has(id)) {
+        this.deadFiles.add(id);
+        this.touchedFiles.delete(id);
       }
     }
   }

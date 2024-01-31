@@ -1,0 +1,41 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.5.3/schema.json",
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "all": true,
+      "style": {
+        "useBlockStatements": "off"
+      },
+      "nursery": {
+        "noNodejsModules": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": {
+            "maxAllowedComplexity": 20
+          }
+        }
+      }
+    }
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 80,
+    "lineEnding": "lf",
+    "ignore": []
+  },
+  "javascript": {
+    "globals": ["$", "unsafeWindow", "fs", "GM_download"],
+    "formatter": {
+      "quoteStyle": "single"
+    }
+  }
+}

@@ -34,6 +34,7 @@
   },
   "homepage": "https://github.com/stauren/vite-plugin-deadfile/tree/main/#readme",
   "devDependencies": {
+    "@biomejs/biome": "1.5.3",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.8.10",
     "rollup": "^4.8.0",
