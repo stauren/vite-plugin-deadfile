@@ -1,5 +1,9 @@
 {
-    "cSpell.words": [
-        "deadfile"
-    ]
+  "cSpell.words": ["deadfile"],
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "quickfix.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  }
 }

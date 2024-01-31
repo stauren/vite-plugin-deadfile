@@ -1,5 +1,10 @@
+import type {
+  ArrowFunctionExpression,
+  Expression,
+  ImportDeclaration,
+  TsType,
+} from '@swc/core';
 import { Visitor } from '@swc/core/Visitor';
-import type { TsType, ImportDeclaration, Expression, ArrowFunctionExpression } from '@swc/core';
 
 export class ImportVisitor extends Visitor {
   private imports: string[] = [];

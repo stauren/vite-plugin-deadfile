@@ -1,13 +1,13 @@
 import { promises as fs } from 'node:fs';
-import { resolve, extname, relative } from 'node:path';
-import { parse, type Module } from '@swc/core';
+import { extname, relative, resolve } from 'node:path';
+import { type Module, parse } from '@swc/core';
 import { ensureDir } from 'fs-extra';
 import { createFilter } from 'vite';
-import { ImportVisitor, DynamicImportVisitor } from './visitor';
-import { isSafeFileName, isSafePath, cleanUrl, isParentDir } from './utils';
-import { log } from './log';
-import FileMarker from './file-marker';
 import type { FilterPattern, Plugin } from 'vite';
+import FileMarker from './file-marker';
+import { log } from './log';
+import { cleanUrl, isParentDir, isSafeFileName, isSafePath } from './utils';
+import { DynamicImportVisitor, ImportVisitor } from './visitor';
 
 type FileUsedCallback = (file: string) => boolean;
 
@@ -33,7 +33,9 @@ function getOutputPath(absRoot: string, outputDir: string): false | string {
     log(`Unsafe outputDir: ${outputDir}`);
     return false;
   }
-  const absOutputDir = outputDir.startsWith('/') ? outputDir : resolve(absRoot, outputDir);
+  const absOutputDir = outputDir.startsWith('/')
+    ? outputDir
+    : resolve(absRoot, outputDir);
 
   if (!isParentDir(absRoot, absOutputDir)) {
     log(`outputDir must be inside: ${absRoot}, but got: ${absOutputDir}`);
@@ -43,7 +45,11 @@ function getOutputPath(absRoot: string, outputDir: string): false | string {
   return absOutputDir;
 }
 
-async function ensureOutputFilePath(absRoot: string, outputDir: string, output: string): Promise<false | string> {
+async function ensureOutputFilePath(
+  absRoot: string,
+  outputDir: string,
+  output: string,
+): Promise<false | string> {
   const dir = getOutputPath(absRoot, outputDir);
   if (!dir) return dir;
   if (!isSafeFileName(output)) {
@@ -55,9 +61,15 @@ async function ensureOutputFilePath(absRoot: string, outputDir: string, output: 
 }
 
 // refer to https://github.com/micromatch/picomatch for more match pattern
-function createFileFilter(root: string, include: FilterPattern, rawExclude: FilterPattern, includeHidden: boolean) {
-  const exclude =
-    rawExclude instanceof Array ? [...rawExclude] : ([rawExclude].filter((o) => o !== null) as (string | RegExp)[]);
+function createFileFilter(
+  root: string,
+  include: FilterPattern,
+  rawExclude: FilterPattern,
+  includeHidden: boolean,
+) {
+  const exclude = Array.isArray(rawExclude)
+    ? [...rawExclude]
+    : ([rawExclude].filter((o) => o !== null) as (string | RegExp)[]);
 
   // exclude all files in node_modules directory
   exclude.push(REG_NODE_MODULES);
@@ -77,7 +89,9 @@ function isLegalTransformTarget(importer: string): boolean {
     return false;
   }
 
-  const ext = extname(REG_VALID_EXTENSION.test(importer) ? importer : cleanUrl(importer)).slice(1);
+  const ext = extname(
+    REG_VALID_EXTENSION.test(importer) ? importer : cleanUrl(importer),
+  ).slice(1);
 
   if (!astSupportedFileExtensions.includes(ext)) {
     return false;
@@ -85,12 +99,46 @@ function isLegalTransformTarget(importer: string): boolean {
   return true;
 }
 
-function getPrePlugin({
-  root = '.',
-  include = [],
-  exclude = [],
-  includeHiddenFiles = false,
-}: DeadFilePluginConfig): Plugin {
+function markDynamicImportFiles(
+  fileMarker: FileMarker,
+  root: string,
+  isDynamicModuleLive?: FileUsedCallback,
+) {
+  const dynImport = fileMarker.viteDynamicImports;
+  if (dynImport.size > 0) {
+    if (isDynamicModuleLive) {
+      for (const file of dynImport) {
+        const rel = relative(root, file);
+        if (!isDynamicModuleLive(rel)) {
+          fileMarker.kill(file);
+        }
+      }
+    }
+  }
+}
+
+function shouldThrow(throwWhenFound: boolean | number, fileMarker: FileMarker) {
+  if (throwWhenFound !== false) {
+    if (
+      (throwWhenFound === true && fileMarker.deadFiles.size > 0) ||
+      (typeof throwWhenFound === 'number' &&
+        fileMarker.deadFiles.size >= throwWhenFound)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getPrePlugin(
+  fileMarker: FileMarker,
+  {
+    root = '.',
+    include = [],
+    exclude = [],
+    includeHiddenFiles = false,
+  }: DeadFilePluginConfig,
+): Plugin {
   const absoluteRoot = resolve(root);
 
   let visitor: ImportVisitor;
@@ -100,13 +148,18 @@ function getPrePlugin({
     apply: 'build',
 
     async configResolved() {
-      const fileFilter = createFileFilter(root, include, exclude, includeHiddenFiles);
-      await FileMarker.init(absoluteRoot, fileFilter);
+      const fileFilter = createFileFilter(
+        root,
+        include,
+        exclude,
+        includeHiddenFiles,
+      );
+      await fileMarker.init(absoluteRoot, fileFilter);
       visitor = new ImportVisitor();
     },
 
     load(id: string) {
-      FileMarker.touch(id);
+      fileMarker.revive(id);
     },
 
     async transform(source, importer) {
@@ -131,25 +184,28 @@ function getPrePlugin({
           rawImports.map((rawImport) => {
             const resolved = this.resolve(rawImport, importer);
             return resolved;
-          })
+          }),
         );
         const resolvedIds = resolvedImports.map((r) => r?.id);
-        resolvedIds.forEach((id) => {
+        for (const id of resolvedIds) {
           if (id) {
-            FileMarker.touch(id);
+            fileMarker.revive(id);
           }
-        });
+        }
       }
     },
   };
 }
-function getPostPlugin({
-  root = '.',
-  outputDir = '.',
-  throwWhenFound = false,
-  isDynamicModuleLive,
-  output,
-}: DeadFilePluginConfig): Plugin {
+function getPostPlugin(
+  fileMarker: FileMarker,
+  {
+    root = '.',
+    outputDir = '.',
+    throwWhenFound = false,
+    isDynamicModuleLive,
+    output,
+  }: DeadFilePluginConfig,
+): Plugin {
   let visitor: DynamicImportVisitor;
   const absoluteRoot = resolve(root);
 
@@ -185,32 +241,28 @@ function getPostPlugin({
             rawImports.map((rawImport) => {
               const resolved = this.resolve(rawImport, importer);
               return resolved;
-            })
+            }),
           );
-          resolvedImports.forEach((resolvedId) => resolvedId && FileMarker.viteDynamicImports.add(resolvedId.id));
+          for (const resolvedId of resolvedImports) {
+            if (resolvedId) {
+              fileMarker.viteDynamicImports.add(resolvedId.id);
+            }
+          }
         }
       }
     },
     async buildEnd() {
-      const dynImport = FileMarker.viteDynamicImports;
-      if (dynImport.size > 0) {
-        if (isDynamicModuleLive) {
-          dynImport.forEach((file) => {
-            const rel = relative(absoluteRoot, file);
-            if (!isDynamicModuleLive(rel)) {
-              FileMarker.deadFiles.add(file);
-              FileMarker.touchedFiles.delete(file);
-            }
-          });
-        }
-      }
+      const dynImport = fileMarker.viteDynamicImports;
+      markDynamicImportFiles(fileMarker, absoluteRoot, isDynamicModuleLive);
 
       let result = [
         '[vite-plugin-deadfile]:',
-        `  All source files: ${FileMarker.sourceFiles.size}`,
-        `  Used source files: ${FileMarker.touchedFiles.size}`,
-        `  Unused source files: ${FileMarker.deadFiles.size}`,
-        ...[...FileMarker.deadFiles].map((fullPath) => `    ./${relative(absoluteRoot, fullPath)}`),
+        `  All source files: ${fileMarker.sourceFiles.size}`,
+        `  Used source files: ${fileMarker.touchedFiles.size}`,
+        `  Unused source files: ${fileMarker.deadFiles.size}`,
+        ...[...fileMarker.deadFiles].map(
+          (fullPath) => `    ./${relative(absoluteRoot, fullPath)}`,
+        ),
       ];
       if (dynImport.size > 0 && !isDynamicModuleLive) {
         result = [
@@ -220,30 +272,33 @@ function getPostPlugin({
           } dynamically glob-import file${
             dynImport.size > 1 ? 's are' : ' is'
           } needed, more info https://github.com/stauren/vite-plugin-deadfile?tab=readme-ov-file#isdynamicmodulelive`,
-          ...[...dynImport].map((fullPath) => `    .${fullPath.substring(absoluteRoot.length)}`),
+          ...[...dynImport].map(
+            (fullPath) => `    .${fullPath.substring(absoluteRoot.length)}`,
+          ),
         ];
       }
 
       if (output) {
-        const outputFile = await ensureOutputFilePath(absoluteRoot, outputDir, output);
+        const outputFile = await ensureOutputFilePath(
+          absoluteRoot,
+          outputDir,
+          output,
+        );
         if (outputFile) {
           await fs.writeFile(outputFile, result.join('\n'));
           log(`Unused source files write to: ${outputFile}`);
         }
       } else {
+        // biome-ignore lint/suspicious/noConsoleLog: plugin output
         result.map((line) => console.log(line));
       }
 
-      if (throwWhenFound !== false) {
-        if (
-          (throwWhenFound === true && FileMarker.deadFiles.size > 0) ||
-          (typeof throwWhenFound === 'number' && FileMarker.deadFiles.size >= throwWhenFound)
-        )
-          this.error(
-            `[vite-plugin-deadfile]: Found ${FileMarker.deadFiles.size} unused source file${
-              FileMarker.deadFiles.size > 1 ? 's' : ''
-            }.`
-          );
+      if (shouldThrow(throwWhenFound, fileMarker)) {
+        this.error(
+          `[vite-plugin-deadfile]: Found ${
+            fileMarker.deadFiles.size
+          } unused source file${fileMarker.deadFiles.size > 1 ? 's' : ''}.`,
+        );
       }
     },
   };
@@ -259,14 +314,15 @@ export default function vitePluginDeadFile({
   isDynamicModuleLive,
   output,
 }: DeadFilePluginConfig): Plugin[] {
+  const fileMarker = new FileMarker();
   return [
-    getPrePlugin({
+    getPrePlugin(fileMarker, {
       root,
       include,
       exclude,
       includeHiddenFiles,
     }),
-    getPostPlugin({
+    getPostPlugin(fileMarker, {
       root,
       outputDir,
       throwWhenFound,
