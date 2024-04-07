@@ -1,4 +1,9 @@
 # Changelog
+## [1.2.2](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.2) (2024-04-07)
+- Fix a bug that an illegal import will break the plugin (import a subpath not specified in exports field of package.json)
+- Fix a bug that dynamic import is not detected when it's not wrapped in an arrow function
+- Only ts and tsx files are parsed in the pre phase now for pure type reference, speed up!
+
 ## [1.2.1](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.1) (2024-01-16)
 - Fix "The CJS build of Vite's Node API is deprecated" warning
 - Add biome to check source code.

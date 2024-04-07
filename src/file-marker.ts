@@ -39,16 +39,15 @@ export default class FileMarker {
   public sourceFiles: Set<string> = new Set();
   public deadFiles: Set<string> = new Set();
   public viteDynamicImports: Set<string> = new Set();
-
-  constructor() {
-    this.touchedFiles = new Set();
-    this.viteDynamicImports = new Set();
-  }
+  public errorFiles: Map<string, string> = new Map();
 
   public async init(root: string, filter: ReturnType<typeof createFilter>) {
+    this.touchedFiles = new Set();
+    this.viteDynamicImports = new Set();
     this.sourceFiles = new Set(await readSourceFiles(root, filter));
     this.deadFiles = new Set(this.sourceFiles);
   }
+
   public revive(id: string) {
     if (id.indexOf('node_modules') === -1) {
       if (this.sourceFiles.has(id)) {
@@ -65,5 +64,9 @@ export default class FileMarker {
         this.touchedFiles.delete(id);
       }
     }
+  }
+
+  public markError(importer: string, err: string) {
+    this.errorFiles.set(importer, err);
   }
 }

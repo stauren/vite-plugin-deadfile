@@ -1,5 +1,5 @@
 import type {
-  ArrowFunctionExpression,
+  CallExpression,
   Expression,
   ImportDeclaration,
   TsType,
@@ -26,31 +26,28 @@ export class ImportVisitor extends Visitor {
 
 export class DynamicImportVisitor extends Visitor {
   private collectViteDynamicImport = false;
-  private viteDynamicImports: string[] = [];
+  private viteDynamicImports: Set<string> = new Set();
   public init() {
-    this.viteDynamicImports = [];
+    this.viteDynamicImports = new Set();
   }
   public visitTsType(n: TsType) {
     return n;
   }
-  public visitArrowFunctionExpression(n: ArrowFunctionExpression): Expression {
+  public visitCallExpression(n: CallExpression): Expression {
     let isHelper = false;
-    const bd = n.body;
-    if (bd.type === 'CallExpression') {
-      if (bd.callee.type === 'Identifier') {
-        // () => __variableDynamicImportRuntimeHelper((/* #__PURE__ */ Object.assign({"./path/to/file.tsx": () => import("./path/to/file.tsx"),})), `./path/to/${moduleName}.tsx`);
-        if (bd.callee.value === '__variableDynamicImportRuntimeHelper') {
-          isHelper = true;
-          this.collectViteDynamicImport = true;
-        }
-      } else if (bd.callee.type === 'Import' && this.collectViteDynamicImport) {
-        const { expression } = bd.arguments[0];
-        if (expression.type === 'StringLiteral') {
-          this.viteDynamicImports.push(expression.value);
-        }
+    if (n.callee.type === 'Identifier') {
+      if (n.callee.value === '__variableDynamicImportRuntimeHelper') {
+        // __variableDynamicImportRuntimeHelper((/* #__PURE__ */ Object.assign({"./path/to/file.tsx": () => import("./path/to/file.tsx"),})), `./path/to/${moduleName}.tsx`);
+        isHelper = true;
+        this.collectViteDynamicImport = true;
+      }
+    } else if (n.callee.type === 'Import' && this.collectViteDynamicImport) {
+      const { expression } = n.arguments[0];
+      if (expression.type === 'StringLiteral') {
+        this.viteDynamicImports.add(expression.value);
       }
     }
-    const result = super.visitArrowFunctionExpression(n);
+    const result = super.visitCallExpression(n);
 
     if (isHelper) {
       this.collectViteDynamicImport = false;
@@ -58,6 +55,6 @@ export class DynamicImportVisitor extends Visitor {
     return result;
   }
   public getViteDynamicImports() {
-    return this.viteDynamicImports;
+    return [...this.viteDynamicImports];
   }
 }
