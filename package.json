@@ -1,19 +1,11 @@
 {
   "name": "vite-plugin-deadfile",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "license": "MIT",
   "author": "stauren@qq.com",
   "type": "module",
-  "files": [
-    "dist"
-  ],
-  "keywords": [
-    "frontend",
-    "unused",
-    "dead",
-    "source",
-    "vite"
-  ],
+  "files": ["dist", "CHANGELOG.md", "README.md", "LICENSE"],
+  "keywords": ["frontend", "unused", "dead", "source", "vite"],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
