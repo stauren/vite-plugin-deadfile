@@ -1,11 +1,10 @@
-import { promises as fs } from 'node:fs';
-import { extname, relative, resolve } from 'node:path';
+import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { type Module, parse } from '@swc/core';
 import { ensureDir } from 'fs-extra';
 import { createFilter } from 'vite';
 import type { FilterPattern, Plugin } from 'vite';
 import FileMarker from './file-marker';
-import { log } from './log';
+import { log, outputLog } from './log';
 import { cleanUrl, isParentDir, isSafeFileName, isSafePath } from './utils';
 import { DynamicImportVisitor, ImportVisitor } from './visitor';
 
@@ -30,18 +29,16 @@ const REG_MISSING_SPECIFIER = /Missing .* specifier in .* package/;
 const astSupportedFileExtensions = ['js', 'jsx', 'ts', 'tsx'];
 const tsSupportedFileExtensions = ['ts', 'tsx'];
 
-function getOutputPath(absRoot: string, outputDir: string): false | string {
+function getOutputPath(absRoot: string, outputDir: string): string {
   if (!isSafePath(outputDir)) {
-    log(`Unsafe outputDir: ${outputDir}`);
-    return false;
+    throw `Unsafe outputDir: ${outputDir}`;
   }
-  const absOutputDir = outputDir.startsWith('/')
+  const absOutputDir = isAbsolute(outputDir)
     ? outputDir
     : resolve(absRoot, outputDir);
 
   if (!isParentDir(absRoot, absOutputDir)) {
-    log(`outputDir must be inside: ${absRoot}, but got: ${absOutputDir}`);
-    return false;
+    throw `outputDir must be inside: ${absRoot}, but got: ${absOutputDir}`;
   }
 
   return absOutputDir;
@@ -51,12 +48,10 @@ async function ensureOutputFilePath(
   absRoot: string,
   outputDir: string,
   output: string,
-): Promise<false | string> {
+): Promise<string> {
   const dir = getOutputPath(absRoot, outputDir);
-  if (!dir) return dir;
   if (!isSafeFileName(output)) {
-    log(`Unsafe output file name: ${output}`);
-    return false;
+    throw `Unsafe output file name: ${output}`;
   }
   await ensureDir(dir);
   return resolve(dir, output);
@@ -151,7 +146,7 @@ function getPrePlugin(
 
   let visitor: ImportVisitor;
   return {
-    name: 'dead-file-pre',
+    name: 'vite-plugin-deadfile-pre',
     enforce: 'pre',
     apply: 'build',
 
@@ -233,7 +228,7 @@ function getPostPlugin(
   const absoluteRoot = resolve(root);
 
   return {
-    name: 'dead-file-post',
+    name: 'vite-plugin-deadfile-post',
     enforce: 'post',
     apply: 'build',
 
@@ -296,25 +291,23 @@ function getPostPlugin(
       }
 
       let result = [
-        '',
-        '[vite-plugin-deadfile]:',
-        `  All source files: ${fileMarker.sourceFiles.size}`,
-        `  Used source files: ${fileMarker.touchedFiles.size}`,
-        `  Unused source files: ${fileMarker.deadFiles.size}`,
+        `All source files: ${fileMarker.sourceFiles.size}`,
+        `Used source files: ${fileMarker.touchedFiles.size}`,
+        `Unused source files: ${fileMarker.deadFiles.size}`,
         ...[...fileMarker.deadFiles].map(
-          (fullPath) => `    ./${relative(absoluteRoot, fullPath)}`,
+          (fullPath) => `  ./${relative(absoluteRoot, fullPath)}`,
         ),
       ];
       if (dynImport.size > 0 && !isDynamicModuleLive) {
         result = [
           ...result,
-          `  You may need to config 'isDynamicModuleLive' to check if the following ${
+          `You may need to config 'isDynamicModuleLive' to check if the following ${
             dynImport.size
           } dynamically glob-import file${
             dynImport.size > 1 ? 's are' : ' is'
           } needed, more info https://github.com/stauren/vite-plugin-deadfile?tab=readme-ov-file#isdynamicmodulelive`,
           ...[...dynImport].map(
-            (fullPath) => `    .${fullPath.substring(absoluteRoot.length)}`,
+            (fullPath) => `  .${fullPath.substring(absoluteRoot.length)}`,
           ),
         ];
       }
@@ -324,14 +317,14 @@ function getPostPlugin(
           absoluteRoot,
           outputDir,
           output,
-        );
+        ).catch((err: string | Error) => {
+          this.error(err);
+        });
         if (outputFile) {
-          await fs.writeFile(outputFile, result.join('\n'));
-          log(`Unused source files write to: ${outputFile}`);
+          outputLog(result, outputFile);
         }
       } else {
-        // biome-ignore lint/suspicious/noConsoleLog: plugin output
-        result.map((line) => console.log(line));
+        outputLog(result);
       }
 
       if (shouldThrow(throwWhenFound, fileMarker)) {

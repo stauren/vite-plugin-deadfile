@@ -1,4 +1,9 @@
 # Changelog
+## [1.2.3](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.3) (2024-04-09)
+- fix https://github.com/stauren/vite-plugin-deadfile/issues/16, an error message falsely popup when the outputDir is the root dir, better win path format support
+- change the plugin name to be more traceable
+- refactor logger a bit
+
 ## [1.2.2](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.2) (2024-04-07)
 - Fix a bug that an illegal import will break the plugin (import a subpath not specified in exports field of package.json)
 - Fix a bug that dynamic import is not detected when it's not wrapped in an arrow function
