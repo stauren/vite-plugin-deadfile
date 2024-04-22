@@ -278,7 +278,8 @@ function getPostPlugin(
         }
       }
     },
-    async buildEnd() {
+    async buildEnd(errors) {
+      if (errors !== undefined) return;
       const dynImport = fileMarker.viteDynamicImports;
       markDynamicImportFiles(fileMarker, absoluteRoot, isDynamicModuleLive);
 
