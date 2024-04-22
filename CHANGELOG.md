@@ -1,4 +1,7 @@
 # Changelog
+## [1.2.4](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.4) (2024-04-22)
+- fix an error when build fails falsy dead files list is given
+
 ## [1.2.3](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.3) (2024-04-09)
 - fix https://github.com/stauren/vite-plugin-deadfile/issues/16, an error message falsely popup when the outputDir is the root dir, better win path format support
 - change the plugin name to be more traceable
