@@ -1,4 +1,7 @@
 # Changelog
+## [1.2.5](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.5) (2024-05-09)
+- now the dead file list will be displayed when `throwWhenFound` terminates the build process
+
 ## [1.2.4](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.4) (2024-04-22)
 - fix an error when build fails falsy dead files list is given
 

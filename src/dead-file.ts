@@ -332,7 +332,11 @@ function getPostPlugin(
         this.error(
           `[vite-plugin-deadfile]: Found ${
             fileMarker.deadFiles.size
-          } unused source file${fileMarker.deadFiles.size > 1 ? 's' : ''}.`,
+          } unused source file${fileMarker.deadFiles.size > 1 ? 's' : ''}.\n${[
+            ...fileMarker.deadFiles,
+          ]
+            .map((fullPath) => `  ./${relative(absoluteRoot, fullPath)}`)
+            .join('\n')}`,
         );
       }
     },
