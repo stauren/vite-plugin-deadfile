@@ -175,6 +175,9 @@ export default defineConfig({
 ### Check before deleting
 Some unreferenced files such as markdowns may be useful, check again before deleting those files.
 
+### Passively imported Type Declaration files can NOT be traced
+Type files imported explicitly could be traced. Type Declarations like `vite/client.d.ts` loaded passively could NOT be traced. You could put them in the `exclude` config.
+
 ### Pure Type Reference can NOT be traced
 
 >__Update__: After v1.1.0 `@swc/core` is being used to scan import statement in source files, it is traceable now. Still, be aware that the scan could go wrong in edge cases. Please check again before removing any source files and report those issues on github.
