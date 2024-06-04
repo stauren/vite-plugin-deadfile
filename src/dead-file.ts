@@ -29,6 +29,12 @@ const REG_MISSING_SPECIFIER = /Missing .* specifier in .* package/;
 const astSupportedFileExtensions = ['js', 'jsx', 'ts', 'tsx'];
 const tsSupportedFileExtensions = ['ts', 'tsx'];
 
+function getExt(importer: string) {
+  return extname(
+    REG_VALID_EXTENSION.test(importer) ? importer : cleanUrl(importer),
+  ).slice(1);
+}
+
 function getOutputPath(absRoot: string, outputDir: string): string {
   if (!isSafePath(outputDir)) {
     throw `Unsafe outputDir: ${outputDir}`;
@@ -89,9 +95,7 @@ function isLegalTransformTarget(
     return false;
   }
 
-  const ext = extname(
-    REG_VALID_EXTENSION.test(importer) ? importer : cleanUrl(importer),
-  ).slice(1);
+  const ext = getExt(importer);
 
   const legalExts = onlyScanTypeRef
     ? tsSupportedFileExtensions
@@ -162,7 +166,15 @@ function getPrePlugin(
     },
 
     load(id: string) {
-      fileMarker.revive(id);
+      // some files like css styles are imported with a lot of query
+      const clearId = cleanUrl(id);
+
+      // 'public/vite.svg' will be load as 'vite:asset:public/vite.svg'
+      const realId = clearId.startsWith('\0vite:asset:')
+        ? resolve(absoluteRoot, clearId.substring(12))
+        : clearId;
+
+      fileMarker.revive(realId);
     },
 
     /**

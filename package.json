@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-deadfile",
-  "version": "1.2.5",
+  "version": "1.3.0",
   "license": "MIT",
   "author": "stauren@qq.com",
   "type": "module",

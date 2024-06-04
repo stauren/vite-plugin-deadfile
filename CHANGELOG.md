@@ -1,4 +1,9 @@
 # Changelog
+## [1.3.0](https://github.com/stauren/vite-plugin-deadfile/tree/v1.3.0) (2024-06-04)
+- Style files imported in Vue's [style block](https://vuejs.org/api/sfc-spec.html#style) can be traced correctly now.
+- Asset files like `public/vite.svg` can be traced correctly now.
+- Add warning of untraceable typescript declaration files in README
+
 ## [1.2.5](https://github.com/stauren/vite-plugin-deadfile/tree/v1.2.5) (2024-05-09)
 - now the dead file list will be displayed when `throwWhenFound` terminates the build process
 
