@@ -3,6 +3,7 @@
 This plugin helps to find unused source file(dead files) in Vite projects.
 
 Features:
+
 - Pure type reference could be detected with the help of `@swc/core`.
 - Help to manage unused source files imported unintentionally by Vite's [dynamic import](https://vitejs.dev/guide/features.html#dynamic-import) feature.
 
@@ -32,7 +33,7 @@ export default defineConfig({
 
 ## Options
 
-### root 
+### root
 
 A string. Project root directory. Can be an absolute path, or a path relative to the current working directory.
 
@@ -46,7 +47,8 @@ Source files to be compared with files referenced during compilation.
 
 If no value is provided, all files in the root directory will be considered as source files.
 
-Please refer to https://www.npmjs.com/package/@rollup/pluginutils#createfilter for more detail.
+Please refer to <https://www.npmjs.com/package/@rollup/pluginutils#createfilter> for more detail.
+
 ```js
 import { defineConfig } from 'vite';
 import deadFile from 'vite-plugin-deadfile';
@@ -64,7 +66,8 @@ A valid [picomatch](https://github.com/micromatch/picomatch#globbing-features) p
 
 Files to be configured as non-source files, so they won't appear in the result.
 
-Please refer to https://www.npmjs.com/package/@rollup/pluginutils#createfilter for more detail.
+Please refer to <https://www.npmjs.com/package/@rollup/pluginutils#createfilter> for more detail.
+
 ```js
 import { defineConfig } from 'vite';
 import deadFile from 'vite-plugin-deadfile';
@@ -79,6 +82,7 @@ export default defineConfig({
 > `node_modules` are excluded by default.
 
 ### includeHiddenFiles
+
 Accept hidden files (file with a name start with `.`) as source files.
 
 Default to false.
@@ -173,9 +177,11 @@ export default defineConfig({
 ## Caveats
 
 ### Check before deleting
+
 Some unreferenced files such as markdowns may be useful, check again before deleting those files.
 
 ### Passively imported Type Declaration files can NOT be traced
+
 Type files imported explicitly could be traced. Type Declarations like `vite/client.d.ts` loaded passively could NOT be traced. You could put them in the `exclude` config.
 
 ### Pure Type Reference can NOT be traced
@@ -194,6 +200,7 @@ export interface A {}
 import type { A } from './interface-a';
 export function main(param: A) {}
 ```
+
 This is because vite use rollup to build a project. Since rollup only build javascript files, a typescript file must be transformed into javascript before handing to rollup, vite does this with [esbuild plugin](https://github.com/vitejs/vite/blob/main/packages/vite/src/node/plugins/esbuild.ts) in transform hook:
 
 ```typescript
