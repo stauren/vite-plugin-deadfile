@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.5.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
   "organizeImports": {
     "enabled": true
   },
@@ -8,10 +8,8 @@
     "rules": {
       "all": true,
       "style": {
-        "useBlockStatements": "off"
-      },
-      "nursery": {
-        "noNodejsModules": "off"
+        "useBlockStatements": "off",
+        "useNamingConvention": "off"
       },
       "complexity": {
         "noExcessiveCognitiveComplexity": {
@@ -20,6 +18,9 @@
             "maxAllowedComplexity": 20
           }
         }
+      },
+      "suspicious": {
+        "noImplicitAnyLet": "error"
       }
     }
   },
@@ -37,5 +38,8 @@
     "formatter": {
       "quoteStyle": "single"
     }
+  },
+  "files": {
+    "include": ["./src", "./scripts/test/*.ts"]
   }
 }
